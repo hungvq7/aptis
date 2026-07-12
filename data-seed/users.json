@@ -1,0 +1,9 @@
+[
+  {
+    "id": "d6a40a02-1d22-44af-a539-778a1a7da895",
+    "email": "demo@aptisprep.example",
+    "name": "Người dùng Demo",
+    "passwordHash": "$2b$10$TTzrW9fyOE8dSmos7h0HPuh5iiV32O2fgE82FRhJ5tfWyXPYYPyjW",
+    "createdAt": "2026-07-12T05:51:46.028Z"
+  }
+]

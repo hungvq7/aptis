@@ -1,8 +1,15 @@
 import { promises as fs } from "fs"
+import os from "os"
 import path from "path"
 import type { z } from "zod"
 
-const DATA_DIR = path.join(process.cwd(), "data")
+// Vercel's deployed function bundle is read-only — only os.tmpdir() is
+// writable there, and it's ephemeral (reset on cold start, not shared across
+// instances). Local dev keeps writing straight into the repo's ./data so it
+// survives restarts. See data-seed/ below for how a fresh Vercel instance
+// gets bootstrapped with usable demo content instead of starting empty.
+const DATA_DIR = process.env.VERCEL ? path.join(os.tmpdir(), "aptis-data") : path.join(process.cwd(), "data")
+const SEED_DIR = path.join(process.cwd(), "data-seed")
 
 // Per-file write queues so concurrent route handler invocations (Next dev can
 // fire requests in parallel) don't interleave writes and corrupt a JSON file.
@@ -10,6 +17,15 @@ const writeQueues = new Map<string, Promise<unknown>>()
 
 async function ensureDataDir() {
   await fs.mkdir(DATA_DIR, { recursive: true })
+}
+
+/** Seeds a fresh runtime file from data-seed/ (checked into git) so a cold Vercel instance starts with usable demo content instead of an empty collection. */
+async function readSeedOrEmpty(fileName: string): Promise<string> {
+  try {
+    return await fs.readFile(path.join(SEED_DIR, fileName), "utf-8")
+  } catch {
+    return "[]"
+  }
 }
 
 async function readCollection<T>(fileName: string, schema: z.ZodType<T>): Promise<T[]> {
@@ -32,8 +48,9 @@ async function readCollection<T>(fileName: string, schema: z.ZodType<T>): Promis
     })
   } catch (error: unknown) {
     if (error instanceof Error && "code" in error && (error as NodeJS.ErrnoException).code === "ENOENT") {
-      await fs.writeFile(filePath, "[]", "utf-8")
-      return []
+      const seedRaw = await readSeedOrEmpty(fileName)
+      await fs.writeFile(filePath, seedRaw, "utf-8")
+      return readCollection(fileName, schema)
     }
     throw error
   }
